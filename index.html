@@ -204,7 +204,16 @@ main { padding:14px; max-width:600px; margin:0 auto; }
 .day-detail-item span:last-child { color:var(--red); font-weight:700; }
 
 /* ══ CATEGORY ══ */
-.cat-row { background:#1E1E1E; border-radius:12px; padding:13px 14px; margin-bottom:9px; border:2px solid #333333; display:flex; align-items:center; gap:12px; }
+.cat-row { background:#1E1E1E; border-radius:12px; padding:13px 14px; border:2px solid #333333; display:flex; align-items:center; gap:12px; cursor:pointer; transition:border-color 0.2s; }
+.cat-row:active { border-color:var(--green); }
+.cat-wrap { background:#1E1E1E; border-radius:12px; margin-bottom:9px; border:2px solid #333333; overflow:hidden; transition:border-color 0.2s; }
+.cat-wrap.expanded { border-color:var(--yellow); }
+.cat-detail { display:none; padding:8px 14px 10px 54px; border-top:1px solid #333; }
+.cat-detail.show { display:block; }
+.cat-detail-item { font-size:0.9rem; color:#EEEEEE; padding:5px 0; display:flex; justify-content:space-between; border-bottom:1px dashed #444444; }
+.cat-detail-item span:first-child { color:#ccc; }
+.cat-detail-item span:last-child { color:var(--red); font-weight:700; }
+.cat-detail-date { font-size:0.75rem; color:#888; margin-left:8px; }
 .cat-info { flex:1; }
 .cat-name { font-weight:800; font-size:1.05rem; color:#FFFFFF; }
 .cat-count { font-size:0.9rem; color:#DDDDDD; margin-top:2px; font-weight:700; }
@@ -1072,6 +1081,7 @@ function renderDaily(){
   }).join(''):`<div class="empty-state"><div class="empty-icon">📅</div><div class="empty-text">No expenses this month</div></div>`;
 }
 function toggleDay(id,row){document.getElementById(id).classList.toggle('show');row.classList.toggle('expanded');}
+function toggleCat(id,wrap){document.getElementById(id).classList.toggle('show');wrap.classList.toggle('expanded');}
 
 function renderCategory(){
   const t={};let grand=0;
@@ -1083,14 +1093,19 @@ function renderCategory(){
     const c=CATS[cat]||CATS['பிற'];
     const pct=(data.total/grand*100).toFixed(1);
     const bw=(data.total/maxA*100).toFixed(1);
-    return`<div class="cat-row">
-      <div class="cat-icon" style="background:${c.bg}">${c.icon}</div>
-      <div class="cat-info">
-        <div class="cat-name">${cat}</div>
-        <div class="cat-count">${data.count} expenses · ${pct}%</div>
-        <div class="cat-bar-wrap"><div class="cat-bar" style="width:${bw}%"></div></div>
+    const catExpenses = expenses.filter(e=>e.cat===cat).sort((a,b)=>b.date.localeCompare(a.date));
+    const detailItems = catExpenses.map(e=>`<div class="cat-detail-item"><span>${e.desc}<span class="cat-detail-date">${e.date}</span></span><span>${fmt(e.amt)}</span></div>`).join('');
+    return`<div class="cat-wrap" id="catwrap-${cat.replace(/\s+/g,'_')}">
+      <div class="cat-row" onclick="toggleCat('catdetail-${cat.replace(/\s+/g,'_')}',this.closest('.cat-wrap'))">
+        <div class="cat-icon" style="background:${c.bg}">${c.icon}</div>
+        <div class="cat-info">
+          <div class="cat-name">${cat}</div>
+          <div class="cat-count">${data.count} expenses · ${pct}%</div>
+          <div class="cat-bar-wrap"><div class="cat-bar" style="width:${bw}%"></div></div>
+        </div>
+        <div class="cat-total">${fmt(data.total)}</div>
       </div>
-      <div class="cat-total">${fmt(data.total)}</div>
+      <div class="cat-detail" id="catdetail-${cat.replace(/\s+/g,'_')}">${detailItems}</div>
     </div>`;
   }).join(''):`<div class="empty-state"><div class="empty-icon">🏷️</div><div class="empty-text">No data</div></div>`;
 }
