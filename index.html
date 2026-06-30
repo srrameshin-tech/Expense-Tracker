@@ -437,9 +437,20 @@ main { padding:14px; max-width:600px; margin:0 auto; }
               <option value="பிற">📌 Others / பிற</option>
             </select>
           </div>
+        <div class="form-row">
           <div class="form-group">
             <label><span class="lbl-en">DATE</span><span class="lbl-ta">தேதி</span></label>
             <input type="date" id="inp-date">
+          </div>
+          <div class="form-group">
+            <label><span class="lbl-en">PAYMENT MODE</span><span class="lbl-ta">பணம் செலுத்தும் முறை</span></label>
+            <select id="inp-pay">
+              <option value="Cash">💵 Cash</option>
+              <option value="Credit Card">💳 Credit Card</option>
+              <option value="Debit Card">💳 Debit Card</option>
+              <option value="GPay">📱 GPay</option>
+              <option value="Online Pay">🌐 Online Pay</option>
+            </select>
           </div>
         </div>
         <button class="btn-add" id="add-btn" onclick="addExpense()">+ Add Expense / செலவு சேர்க்க</button>
@@ -456,6 +467,7 @@ main { padding:14px; max-width:600px; margin:0 auto; }
         <input type="text" placeholder="Search... / தேடுங்கள்" id="search-inp" oninput="renderExpenses()">
       </div>
       <div class="filter-bar" id="cat-filters"></div>
+      <div class="filter-bar" id="pay-filters"></div>
       <div class="date-filter">
         <span class="dlbl">From:</span>
         <input type="date" id="filter-from" onchange="renderExpenses()" style="background:#1E1E1E;color:#FFFFFF;border:2px solid #444;border-radius:9px;padding:10px;font-size:0.95rem;font-weight:600;font-family:Inter,sans-serif;outline:none;min-width:130px">
@@ -520,6 +532,7 @@ main { padding:14px; max-width:600px; margin:0 auto; }
       <div class="report-toggle">
         <button class="rtog-btn active" id="rtog-month" onclick="switchReport('month')">📅 Month Compare</button>
         <button class="rtog-btn" id="rtog-cat" onclick="switchReport('cat')">🏷️ Category Wise</button>
+        <button class="rtog-btn" id="rtog-pay" onclick="switchReport('pay')">💳 Payment Mode</button>
       </div>
       <div id="report-month-view">
         <div class="section-title">Month Comparison <span class="sub">மாத ஒப்பீடு</span></div>
@@ -528,6 +541,10 @@ main { padding:14px; max-width:600px; margin:0 auto; }
       <div id="report-cat-view" style="display:none">
         <div class="section-title">Category Wise <span class="sub">வகை வாரியாக</span></div>
         <div id="cat-compare-list"></div>
+      </div>
+      <div id="report-pay-view" style="display:none">
+        <div class="section-title">Payment Mode Wise <span class="sub">பணம் செலுத்தும் முறை வாரியாக</span></div>
+        <div id="pay-compare-list"></div>
       </div>
     </div>
 
@@ -712,6 +729,16 @@ main { padding:14px; max-width:600px; margin:0 auto; }
         <option value="பிற">📌 Others / பிற</option>
       </select>
     </div>
+    <div class="form-group">
+      <label><span class="lbl-en">PAYMENT MODE</span><span class="lbl-ta">பணம் செலுத்தும் முறை</span></label>
+      <select id="edit-pay">
+        <option value="Cash">💵 Cash</option>
+        <option value="Credit Card">💳 Credit Card</option>
+        <option value="Debit Card">💳 Debit Card</option>
+        <option value="GPay">📱 GPay</option>
+        <option value="Online Pay">🌐 Online Pay</option>
+      </select>
+    </div>
     <div class="modal-actions">
       <button class="btn-cancel" onclick="closeModal()">Cancel / ரத்து</button>
       <button class="btn-save" onclick="saveEdit()">Save / சேமி</button>
@@ -735,7 +762,7 @@ firebase.initializeApp({
 const auth=firebase.auth(), db=firebase.database();
 const ADMIN_UID='09HcpHL3Apeuiw0FDDgq2mwGy6c2';
 var admUserMap={};
-let currentUser=null, expenses=[], dbRef=null, authMode='signin', activeFilter='ALL';
+let currentUser=null, expenses=[], dbRef=null, authMode='signin', activeFilter='ALL', activePayFilter='ALL';
 
 const CATS={
   'உணவு':         {bg:'#FFF3E0',color:'#E65100',icon:'🍽️'},
@@ -808,6 +835,7 @@ auth.onAuthStateChanged(user=>{
               amt: Number(v.amt) || 0,
               cat: v.cat || 'பிற',
               date: v.date || '',
+              pay: v.pay || 'Cash',
               createdAt: Number(v.createdAt) || 0
             });
           }
@@ -892,12 +920,13 @@ function addExpense(){
   const amt=parseFloat(document.getElementById('inp-amt').value);
   const cat=document.getElementById('inp-cat').value;
   const date=document.getElementById('inp-date').value;
+  const pay=document.getElementById('inp-pay').value;
   if(!desc){alert('Enter description / விவரம் கொடுங்கள்');return;}
   if(!amt||amt<=0){alert('Enter valid amount / சரியான தொகை கொடுங்கள்');return;}
   if(!date){alert('Select date / தேதி தேர்ந்தெடுங்கள்');return;}
   if(!currentUser){alert('Please login again!');return;}
 
-  const data={desc, amt, cat, date, createdAt:Date.now()};
+  const data={desc, amt, cat, date, pay, createdAt:Date.now()};
 
   // Push to Firebase
   try {
@@ -947,6 +976,7 @@ function openEdit(id){
   document.getElementById('edit-amt').value=e.amt;
   document.getElementById('edit-date').value=e.date;
   document.getElementById('edit-cat').value=e.cat;
+  document.getElementById('edit-pay').value=e.pay||'Cash';
   document.getElementById('edit-modal').classList.add('show');
 }
 function closeModal(){document.getElementById('edit-modal').classList.remove('show');}
@@ -956,8 +986,9 @@ function saveEdit(){
   const amt=parseFloat(document.getElementById('edit-amt').value);
   const date=document.getElementById('edit-date').value;
   const cat=document.getElementById('edit-cat').value;
+  const pay=document.getElementById('edit-pay').value;
   if(!desc||!amt||!date){alert('Fill all fields / அனைத்தையும் நிரப்புங்கள்');return;}
-  dbRef.child(id).update({desc:desc, amt:amt, cat:cat, date:date}, function(err){
+  dbRef.child(id).update({desc:desc, amt:amt, cat:cat, date:date, pay:pay}, function(err){
     if(err){ alert('Update failed: '+err.message); }
   });
   closeModal();
@@ -967,11 +998,12 @@ function expCard(e){
   const c=CATS[e.cat]||CATS['பிற'];
   const d=new Date(e.date+'T00:00:00');
   const dl=d.toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'});
+  const payBadge = e.pay ? `<span class="cat-badge" style="background:#333;color:#FFD54A;margin-left:6px">${e.pay}</span>` : '';
   return`<div class="expense-item">
     <div class="cat-icon" style="background:${c.bg}">${c.icon}</div>
     <div class="expense-info">
       <div class="expense-desc">${e.desc}</div>
-      <div class="expense-meta"><span>${dl}</span><span class="cat-badge" style="background:${c.bg};color:${c.color}">${e.cat}</span></div>
+      <div class="expense-meta"><span>${dl}</span><span class="cat-badge" style="background:${c.bg};color:${c.color}">${e.cat}</span>${payBadge}</div>
     </div>
     <div class="expense-right">
       <div class="expense-amount" style="font-family:'Playfair Display',serif">${fmt(e.amt)}</div>
@@ -1007,20 +1039,37 @@ function buildCatFilters(){
   let filtered=[...expenses];
   if(from) filtered=filtered.filter(e=>e.date>=from);
   if(to) filtered=filtered.filter(e=>e.date<=to);
+  if(activePayFilter!=='ALL') filtered=filtered.filter(e=>(e.pay||'Cash')===activePayFilter);
   const usedCats=new Set(filtered.map(e=>e.cat));
   let cats=['ALL',...Object.keys(CATS).filter(c=>usedCats.has(c))];
   if(q) cats=cats.filter(c=>c==='ALL'||c.toLowerCase().includes(q));
   if(activeFilter!=='ALL'&&!usedCats.has(activeFilter)) activeFilter='ALL';
   document.getElementById('cat-filters').innerHTML=cats.map(c=>`<button class="filter-chip${c===activeFilter?' active':''}" onclick="setFilter('${c}')">${c==='ALL'?'All / அனைத்தும்':c}</button>`).join('');
 }
-function setFilter(c){activeFilter=c;buildCatFilters();renderExpenses();}
+const PAY_MODES=['Cash','Credit Card','Debit Card','GPay','Online Pay'];
+function buildPayFilters(){
+  const from=document.getElementById('filter-from')?.value;
+  const to=document.getElementById('filter-to')?.value;
+  let filtered=[...expenses];
+  if(from) filtered=filtered.filter(e=>e.date>=from);
+  if(to) filtered=filtered.filter(e=>e.date<=to);
+  if(activeFilter!=='ALL') filtered=filtered.filter(e=>e.cat===activeFilter);
+  const usedPays=new Set(filtered.map(e=>e.pay||'Cash'));
+  let pays=['ALL',...PAY_MODES.filter(p=>usedPays.has(p))];
+  if(activePayFilter!=='ALL'&&!usedPays.has(activePayFilter)) activePayFilter='ALL';
+  document.getElementById('pay-filters').innerHTML=pays.map(p=>`<button class="filter-chip${p===activePayFilter?' active':''}" onclick="setPayFilter('${p}')">${p==='ALL'?'All Modes / அனைத்தும்':p}</button>`).join('');
+}
+function setFilter(c){activeFilter=c;buildCatFilters();buildPayFilters();renderExpenses();}
+function setPayFilter(p){activePayFilter=p;buildCatFilters();buildPayFilters();renderExpenses();}
 function renderExpenses(){
   buildCatFilters();
+  buildPayFilters();
   const q=(document.getElementById('search-inp')?.value||'').toLowerCase();
   const from=document.getElementById('filter-from')?.value;
   const to=document.getElementById('filter-to')?.value;
   let list=[...expenses];
   if(activeFilter!=='ALL') list=list.filter(e=>e.cat===activeFilter);
+  if(activePayFilter!=='ALL') list=list.filter(e=>(e.pay||'Cash')===activePayFilter);
   if(q) list=list.filter(e=>e.desc.toLowerCase().includes(q)||e.cat.includes(q));
   if(from) list=list.filter(e=>e.date>=from);
   if(to) list=list.filter(e=>e.date<=to);
@@ -1324,8 +1373,10 @@ function switchReport(mode){
   reportMode = mode;
   document.getElementById('rtog-month').classList.toggle('active', mode==='month');
   document.getElementById('rtog-cat').classList.toggle('active', mode==='cat');
+  document.getElementById('rtog-pay').classList.toggle('active', mode==='pay');
   document.getElementById('report-month-view').style.display = mode==='month' ? 'block' : 'none';
   document.getElementById('report-cat-view').style.display = mode==='cat' ? 'block' : 'none';
+  document.getElementById('report-pay-view').style.display = mode==='pay' ? 'block' : 'none';
   renderReports();
 }
 
@@ -1343,7 +1394,8 @@ function renderReports(){
   const yr = ySel.value || new Date().getFullYear();
 
   if(reportMode === 'month') renderMonthCompare(yr);
-  else renderCatCompare(yr);
+  else if(reportMode === 'cat') renderCatCompare(yr);
+  else renderPayCompare(yr);
 }
 
 function renderMonthCompare(yr){
@@ -1392,6 +1444,47 @@ function renderMonthCompare(yr){
 
   document.getElementById('month-compare-list').innerHTML = rows ||
     `<div class="empty-state"><div class="empty-icon">📅</div><div class="empty-text">No data for ${yr}</div></div>`;
+}
+
+function renderPayCompare(yr){
+  const COLORS=['#1B7A3E','#C8102E','#1565C0','#C8960A','#6A1B9A'];
+  const yrExp = expenses.filter(e=>e.date.startsWith(String(yr)));
+  if(!yrExp.length){
+    document.getElementById('pay-compare-list').innerHTML =
+      `<div class="empty-state"><div class="empty-icon">💳</div><div class="empty-text">No data for ${yr}</div></div>`;
+    return;
+  }
+
+  const payData = {};
+  yrExp.forEach(e=>{
+    const p = e.pay || 'Cash';
+    if(!payData[p]) payData[p] = {total:0, count:0};
+    payData[p].total += e.amt;
+    payData[p].count += 1;
+  });
+
+  const total = yrExp.reduce((s,e)=>s+e.amt,0);
+  const maxAmt = Math.max(...Object.values(payData).map(d=>d.total)) || 1;
+  const sorted = Object.entries(payData).sort((a,b)=>b[1].total-a[1].total);
+
+  const rows = sorted.map(([pay,data],i)=>{
+    const pct = (data.total/maxAmt*100).toFixed(1);
+    const sharePct = total ? (data.total/total*100).toFixed(1) : 0;
+    return `<div class="month-compare-row">
+      <div class="mc-header">
+        <span class="mc-month">${pay}</span>
+        <span class="mc-amt">${fmt(data.total)}</span>
+      </div>
+      <div class="mc-bar-bg"><div class="mc-bar" style="width:${pct}%;background:${COLORS[i%COLORS.length]}"></div></div>
+      <div class="mc-footer">
+        <span>${sharePct}% of year</span>
+        <span>${data.count} expenses</span>
+      </div>
+    </div>`;
+  }).join('');
+
+  document.getElementById('pay-compare-list').innerHTML = rows ||
+    `<div class="empty-state"><div class="empty-icon">💳</div><div class="empty-text">No data for ${yr}</div></div>`;
 }
 
 function renderCatCompare(yr){
@@ -1612,6 +1705,7 @@ async function backupData(){
         amt: v.amt||0,
         cat: v.cat||'',
         date: v.date||'',
+        pay: v.pay||'Cash',
         createdAt: v.createdAt||0
       });
     });
@@ -1657,6 +1751,7 @@ Date: ${data.exportDate?.slice(0,10)||'Unknown'}
           amt: exp.amt||0,
           cat: exp.cat||'பிற',
           date: exp.date||'',
+          pay: exp.pay||'Cash',
           createdAt: Date.now(),
           restoredFrom: data.exportDate||''
         };
@@ -1891,4 +1986,5 @@ if('serviceWorker' in navigator){
 </script>
 </body>
 </html>
+
 
