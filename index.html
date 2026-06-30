@@ -1001,11 +1001,14 @@ function renderHome(){
 }
 
 function buildCatFilters(){
-  const cats=['ALL',...Object.keys(CATS)];
+  const q=(document.getElementById('search-inp')?.value||'').toLowerCase().trim();
+  let cats=['ALL',...Object.keys(CATS)];
+  if(q) cats=cats.filter(c=>c==='ALL'||c.toLowerCase().includes(q));
   document.getElementById('cat-filters').innerHTML=cats.map(c=>`<button class="filter-chip${c===activeFilter?' active':''}" onclick="setFilter('${c}')">${c==='ALL'?'All / அனைத்தும்':c}</button>`).join('');
 }
 function setFilter(c){activeFilter=c;buildCatFilters();renderExpenses();}
 function renderExpenses(){
+  buildCatFilters();
   const q=(document.getElementById('search-inp')?.value||'').toLowerCase();
   const from=document.getElementById('filter-from')?.value;
   const to=document.getElementById('filter-to')?.value;
@@ -1881,3 +1884,4 @@ if('serviceWorker' in navigator){
 </script>
 </body>
 </html>
+
